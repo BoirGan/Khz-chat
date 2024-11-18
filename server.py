@@ -27,7 +27,7 @@ def handle_client(client_socket, client_address):
                 # Si un message est envoyé, le transmettre à tous les clients
                 if client_socket in client_pseudonyms:
                     pseudonym = client_pseudonyms[client_socket]
-                    broadcast(f"{pseudonym}: {message}", client_socket)
+                    broadcast(f"{pseudonym}$ {message}", client_socket)
                 else:
                     client_socket.send("Veuillez définir un pseudonyme avec la commande /pseudo 'NAME'".encode("utf-8"))
         except:
@@ -50,25 +50,18 @@ def broadcast(message, client_socket):
 
 # Fonction pour démarrer le serveur
 def start_server():
-    # Récupérer le port à partir de la variable d'environnement 'PORT' de Render, ou utiliser un port par défaut
-    port = int(os.getenv("PORT", 5555))  # Utilise le port de Render ou 5555 en local pour les tests
-
-    # Créer un socket
+    # Récupérer le port de l'environnement (par défaut 5000 si non spécifié)
+    port = int(os.environ.get("PORT", 5555))
+    
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    # Lier le serveur à l'adresse 0.0.0.0 et au port dynamique
-    server.bind(("0.0.0.0", port))
+    server.bind(("0.0.0.0", port))  # Lier au port spécifié par Render
     server.listen(5)
     print(f"Serveur démarré sur le port {port}. En attente de connexions...")
-
+    
     while True:
-        # Accepter une connexion client
         client_socket, client_address = server.accept()
         clients.append(client_socket)
-        
-        # Lancer un thread pour gérer ce client
         threading.Thread(target=handle_client, args=(client_socket, client_address)).start()
 
 # Démarrer le serveur
-if __name__ == "__main__":
-    start_server()
+start_server()
