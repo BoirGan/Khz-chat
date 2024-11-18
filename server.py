@@ -1,9 +1,9 @@
 import socket
 import threading
+import os
 
 clients = []  # Liste des clients connectés
 client_pseudonyms = {}  # Dictionnaire des pseudonymes des clients
-lock = threading.Lock()  # Verrou pour synchroniser l'accès aux ressources partagées
 
 # Fonction pour gérer les messages envoyés par les clients
 def handle_client(client_socket, client_address):
@@ -16,28 +16,13 @@ def handle_client(client_socket, client_address):
         try:
             # Réception des données du client
             message = client_socket.recv(1024).decode("utf-8")
-            if not message:
-                break  # Si le message est vide, le client a probablement quitté
-
-            # Commande pour afficher l'aide
-            if message == "/help":
-                help_message = (
-                    "Commandes disponibles :\n"
-                    "/pseudo <nom> : Définir votre pseudonyme.\n"
-                    "/help : Afficher cette aide.\n"
-                    "Message : Envoyer un message aux autres utilisateurs.\n"
-                )
-                client_socket.send(help_message.encode("utf-8"))
+            
             # Commande pour définir le pseudonyme
-            elif message.startswith("/pseudo "):
-                pseudonym = message.split(" ", 1)[1].strip()  # On récupère le nom après /pseudo
-                if pseudonym:  # Vérifier si le pseudonyme n'est pas vide
-                    with lock:
-                        client_pseudonyms[client_socket] = pseudonym
-                    client_socket.send(f"Pseudonyme défini à {pseudonym}".encode("utf-8"))
-                    broadcast(f"{pseudonym} a rejoint le chat.", client_socket)
-                else:
-                    client_socket.send("Pseudonyme invalide. Veuillez essayer à nouveau.".encode("utf-8"))
+            if message.startswith("/pseudo "):
+                pseudonym = message.split(" ", 1)[1]  # On récupère le nom après /pseudo
+                client_pseudonyms[client_socket] = pseudonym
+                client_socket.send(f"Pseudonyme défini à {pseudonym}".encode("utf-8"))
+                broadcast(f"{pseudonym} a rejoint le chat.", client_socket)
             else:
                 # Si un message est envoyé, le transmettre à tous les clients
                 if client_socket in client_pseudonyms:
@@ -45,41 +30,45 @@ def handle_client(client_socket, client_address):
                     broadcast(f"{pseudonym}: {message}", client_socket)
                 else:
                     client_socket.send("Veuillez définir un pseudonyme avec la commande /pseudo 'NAME'".encode("utf-8"))
-        except Exception as e:
-            print(f"Erreur avec le client {client_address}: {e}")
-            break
-    # Déconnexion propre
-    with lock:
-        if client_socket in clients:
+        except:
+            # En cas d'erreur (par exemple déconnexion), fermer la connexion
+            print(f"Client {client_address} déconnecté.")
             clients.remove(client_socket)
-        if client_socket in client_pseudonyms:
-            del client_pseudonyms[client_socket]
-    client_socket.close()
+            client_socket.close()
+            break
 
 # Fonction pour envoyer un message à tous les clients
 def broadcast(message, client_socket):
-    with lock:
-        for client in clients:
-            if client != client_socket:
-                try:
-                    client.send(message.encode("utf-8"))
-                except:
-                    # En cas d'erreur d'envoi, déconnecter le client
-                    clients.remove(client)
-                    client.close()
+    for client in clients:
+        if client != client_socket:
+            try:
+                client.send(message.encode("utf-8"))
+            except:
+                # En cas d'erreur d'envoi, déconnecter le client
+                clients.remove(client)
+                client.close()
 
 # Fonction pour démarrer le serveur
 def start_server():
+    # Récupérer le port à partir de la variable d'environnement 'PORT' de Render, ou utiliser un port par défaut
+    port = int(os.getenv("PORT", 5555))  # Utilise le port de Render ou 5555 en local pour les tests
+
+    # Créer un socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("127.0.0.1", 5555))
+
+    # Lier le serveur à l'adresse 0.0.0.0 et au port dynamique
+    server.bind(("0.0.0.0", port))
     server.listen(5)
-    print("Serveur démarré. En attente de connexions...")
+    print(f"Serveur démarré sur le port {port}. En attente de connexions...")
 
     while True:
+        # Accepter une connexion client
         client_socket, client_address = server.accept()
-        with lock:
-            clients.append(client_socket)
-        threading.Thread(target=handle_client, args=(client_socket, client_address), daemon=True).start()
+        clients.append(client_socket)
+        
+        # Lancer un thread pour gérer ce client
+        threading.Thread(target=handle_client, args=(client_socket, client_address)).start()
 
 # Démarrer le serveur
-start_server()
+if __name__ == "__main__":
+    start_server()
