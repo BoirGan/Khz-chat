@@ -5,7 +5,8 @@ import socket
 
 # Connexion au serveur
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(("127.0.0.1", 5555))
+client_socket.connect(("khz-chat.onrender.com", 10000))  # Utilisez l'URL et le port corrects
+
 
 # Fonction pour recevoir les messages du serveur dans la GUI
 def receive_messages():

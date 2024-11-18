@@ -1,14 +1,18 @@
+import os
 import socket
 import threading
-import os
+from flask import Flask, request
 
-clients = []  # Liste des clients connectés
-client_pseudonyms = {}  # Dictionnaire des pseudonymes des clients
+app = Flask(__name__)
+
+# Liste des clients connectés
+clients = []
+client_pseudonyms = {}
 
 # Fonction pour gérer les messages envoyés par les clients
 def handle_client(client_socket, client_address):
     print(f"Connexion de {client_address}")
-    
+
     # Demande du pseudonyme
     client_socket.send("Veuillez entrer un pseudonyme en utilisant la commande /pseudo 'NAME' : ".encode("utf-8"))
     
@@ -48,20 +52,25 @@ def broadcast(message, client_socket):
                 clients.remove(client)
                 client.close()
 
-# Fonction pour démarrer le serveur
-def start_server():
-    # Récupérer le port de l'environnement (par défaut 5000 si non spécifié)
+# Démarre un serveur socket classique
+def start_socket_server():
     port = int(os.environ.get("PORT", 5555))
     
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", port))  # Lier au port spécifié par Render
+    server.bind(("0.0.0.0", port))
     server.listen(5)
     print(f"Serveur démarré sur le port {port}. En attente de connexions...")
-    
+
     while True:
         client_socket, client_address = server.accept()
         clients.append(client_socket)
         threading.Thread(target=handle_client, args=(client_socket, client_address)).start()
 
-# Démarrer le serveur
-start_server()
+@app.route('/')
+def home():
+    return "Le serveur est en ligne !"
+
+if __name__ == "__main__":
+    # Lancer le serveur Flask sur le port défini par Render
+    threading.Thread(target=start_socket_server, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
