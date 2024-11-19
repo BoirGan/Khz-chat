@@ -1,8 +1,9 @@
 import os
 import socket
 import threading
-from flask import Flask, request
+from flask import Flask
 
+# Créer une application Flask
 app = Flask(__name__)
 
 # Liste des clients connectés
@@ -34,7 +35,7 @@ def handle_client(client_socket, client_address):
                     broadcast(f"{pseudonym}$ {message}", client_socket)
                 else:
                     client_socket.send("Veuillez définir un pseudonyme avec la commande /pseudo 'NAME'".encode("utf-8"))
-        except:
+        except socket.error:
             # En cas d'erreur (par exemple déconnexion), fermer la connexion
             print(f"Client {client_address} déconnecté.")
             clients.remove(client_socket)
@@ -47,14 +48,14 @@ def broadcast(message, client_socket):
         if client != client_socket:
             try:
                 client.send(message.encode("utf-8"))
-            except:
+            except socket.error:
                 # En cas d'erreur d'envoi, déconnecter le client
                 clients.remove(client)
                 client.close()
 
-# Démarre un serveur socket classique
+# Démarre le serveur socket
 def start_socket_server():
-    port = int(os.environ.get("PORT", 5555))
+    port = int(os.environ.get("PORT", 5555))  # Port défini par Render
     
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("0.0.0.0", port))
@@ -71,6 +72,8 @@ def home():
     return "Le serveur est en ligne !"
 
 if __name__ == "__main__":
-    # Lancer le serveur Flask sur le port défini par Render
+    # Démarre le serveur socket dans un thread séparé
     threading.Thread(target=start_socket_server, daemon=True).start()
+
+    # Lancer le serveur Flask via Gunicorn
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
